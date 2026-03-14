@@ -162,6 +162,16 @@ public class OpdsController {
                 .body(feed);
     }
 
+	@Operation(summary = "Get unread books feed", description = "Retrieve the OPDS feed for unread books.")
+	@ApiResponse(responseCode = "200", description = "Unread books feed returned successfully")
+	@GetMapping(value = "/unread", produces = OPDS_ACQUISITION_MEDIA_TYPE)
+	public ResponseEntity<String> getUnreadFeed(@Parameter(hidden = true) HttpServletRequest request) {
+		String feed = opdsFeedService.generateUnreadFeed(request);
+		return ResponseEntity.ok()
+			.contentType(MediaType.parseMediaType(OPDS_ACQUISITION_MEDIA_TYPE))
+			.body(feed);
+	}
+
     @Operation(summary = "Get OPDS search description", description = "Retrieve the OpenSearch description document for OPDS search.")
     @ApiResponse(responseCode = "200", description = "OpenSearch description returned successfully")
     @GetMapping(value = "/search.opds", produces = {

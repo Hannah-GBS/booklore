@@ -9,5 +9,7 @@ public enum OpdsSortOrder {
     SERIES_ASC,
     SERIES_DESC,
     RATING_ASC,
-    RATING_DESC
+    RATING_DESC,
+	PUBLISHED_ASC,
+	PUBLISHED_DESC
 }

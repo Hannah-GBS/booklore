@@ -53,7 +53,9 @@
     "seriesAsc": "Series (A-Z)",
     "seriesDesc": "Series (Z-A)",
     "ratingAsc": "Rating (Low to High)",
-    "ratingDesc": "Rating (High to Low)"
+    "ratingDesc": "Rating (High to Low)",
+    "publishedAsc": "Published Date (Old to New)",
+    "publishedDesc": "Published Date (New to Old)"
   },
   "deleteConfirm": "Are you sure you want to delete user \"{{username}}\"?",
   "deleteHeader": "Delete Confirmation",

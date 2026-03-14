@@ -118,6 +118,15 @@ public class OpdsFeedService {
                             <content type="text">25 random books from the catalog</content>
                           </entry>
                         """.formatted(now()) +
+			"""
+					  <entry>
+						<title>Unread</title>
+						<id>urn:booklore:catalog:unread</id>
+						<updated>%s</updated>
+						<link rel="subsection" href="/api/v1/opds/unread" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
+						<content type="text">Unread books</content>
+					  </entry>
+					""".formatted(now()) +
                 "</feed>";
         return feed;
     }
@@ -331,16 +340,16 @@ public class OpdsFeedService {
 
         if (magicShelfId != null) {
             booksPage = magicShelfBookService.getBooksByMagicShelfId(userId, magicShelfId, page - 1, size);
+			// Magic shelves still need in-memory sorting
+			booksPage = opdsBookService.applySortOrder(booksPage, sortOrder);
         } else if (author != null && !author.isBlank()) {
-            booksPage = opdsBookService.getBooksByAuthorName(userId, author, page - 1, size);
+            booksPage = opdsBookService.getBooksByAuthorName(userId, author, page - 1, size, sortOrder);
         } else if (series != null && !series.isBlank()) {
-            booksPage = opdsBookService.getBooksBySeriesName(userId, series, page - 1, size);
+            booksPage = opdsBookService.getBooksBySeriesName(userId, series, page - 1, size, sortOrder);
         } else {
-            booksPage = opdsBookService.getBooksPage(userId, query, libraryId, shelfIds, page - 1, size);
+            booksPage = opdsBookService.getBooksPage(userId, query, libraryId, shelfIds, page - 1, size, sortOrder);
         }
 
-        // Apply user's preferred sort order
-        booksPage = opdsBookService.applySortOrder(booksPage, sortOrder);
 
         String feedTitle = determineFeedTitle(libraryId, shelfIds, magicShelfId, author, series);
         String feedId = determineFeedId(libraryId, shelfIds, magicShelfId, author, series);
@@ -377,14 +386,11 @@ public class OpdsFeedService {
 
     public String generateRecentFeed(HttpServletRequest request) {
         Long userId = getUserId();
-        OpdsSortOrder sortOrder = getSortOrder();
         int page = Math.max(1, parseLongParam(request, "page", 1L).intValue());
         int size = Math.min(parseLongParam(request, "size", (long) DEFAULT_PAGE_SIZE).intValue(), MAX_PAGE_SIZE);
 
         Page<Book> booksPage = opdsBookService.getRecentBooksPage(userId, page - 1, size);
 
-        // Apply user's preferred sort order
-        booksPage = opdsBookService.applySortOrder(booksPage, sortOrder);
 
         var feed = new StringBuilder("""
                 <?xml version="1.0" encoding="UTF-8"?>
@@ -432,6 +438,37 @@ public class OpdsFeedService {
         feed.append("</feed>");
         return feed.toString();
     }
+
+	public String generateUnreadFeed(HttpServletRequest request)
+	{
+		Long userId = getUserId();
+		OpdsSortOrder sortOrder = getSortOrder();
+		int page = Math.max(1, parseLongParam(request, "page", 1L).intValue());
+		int size = Math.min(parseLongParam(request, "size", (long) DEFAULT_PAGE_SIZE).intValue(), MAX_PAGE_SIZE);
+
+		Page<Book> booksPage = opdsBookService.getUnreadBooksPage(userId, page - 1, size, sortOrder);
+
+		var feed = new StringBuilder("""
+                <?xml version="1.0" encoding="UTF-8"?>
+                <feed xmlns="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/terms/" xmlns:opds="http://opds-spec.org/2010/catalog" xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">
+                  <id>urn:booklore:catalog:unread</id>
+                  <title>Unread Books</title>
+                  <updated>%s</updated>
+                  <opensearch:totalResults>%d</opensearch:totalResults>
+                  <opensearch:startIndex>%d</opensearch:startIndex>
+                  <opensearch:itemsPerPage>%d</opensearch:itemsPerPage>
+                  <link rel="self" href="%s" type="application/atom+xml;profile=opds-catalog;kind=acquisition"/>
+                  <link rel="start" href="/api/v1/opds" type="application/atom+xml;profile=opds-catalog;kind=navigation"/>
+                  <link rel="search" type="application/opensearchdescription+xml" title="Search" href="/api/v1/opds/search.opds"/>
+                """.formatted(now(), booksPage.getTotalElements(), ((page - 1) * size) + 1, size, escapeXml(buildCurrentUrl(request, page, size))));
+
+		appendPaginationLinks(feed, request, page, booksPage.getTotalPages(), size);
+
+		booksPage.getContent().forEach(book -> appendBookEntry(feed, book));
+
+		feed.append("</feed>");
+		return feed.toString();
+	}
 
     public String getOpenSearchDescription() {
         return """

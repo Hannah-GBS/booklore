@@ -77,7 +77,10 @@ export class OpdsSettings implements OnInit, OnDestroy {
     {label: 'Series (A-Z)', value: 'SERIES_ASC' as OpdsSortOrder, translationKey: 'settingsOpds.sortOrders.seriesAsc'},
     {label: 'Series (Z-A)', value: 'SERIES_DESC' as OpdsSortOrder, translationKey: 'settingsOpds.sortOrders.seriesDesc'},
     {label: 'Rating (Low to High)', value: 'RATING_ASC' as OpdsSortOrder, translationKey: 'settingsOpds.sortOrders.ratingAsc'},
-    {label: 'Rating (High to Low)', value: 'RATING_DESC' as OpdsSortOrder, translationKey: 'settingsOpds.sortOrders.ratingDesc'}
+    {label: 'Rating (High to Low)', value: 'RATING_DESC' as OpdsSortOrder, translationKey: 'settingsOpds.sortOrders.ratingDesc'},
+    {label: 'Published Date (Old to New)', value: 'PUBLISHED_ASC' as OpdsSortOrder, translationKey: 'settingsOpds.sortOrders.publishedAsc'},
+    {label: 'Published Date (New to Old)', value: 'PUBLISHED_DESC' as OpdsSortOrder, translationKey: 'settingsOpds.sortOrders.publishedDesc'}
+
   ];
 
   ngOnInit(): void {

@@ -1,5 +1,6 @@
 package org.booklore.service.opds;
 
+import java.time.LocalDate;
 import org.booklore.exception.ApiError;
 import org.booklore.mapper.BookMapper;
 import org.booklore.mapper.custom.BookLoreUserTransformer;
@@ -63,7 +64,7 @@ public class OpdsBookService {
                 .toList();
     }
 
-    public Page<Book> getBooksPage(Long userId, String query, Long libraryId, Set<Long> shelfIds, int page, int size) {
+    public Page<Book> getBooksPage(Long userId, String query, Long libraryId, Set<Long> shelfIds, int page, int size, OpdsSortOrder sortOrder) {
         if (userId == null) {
             throw ApiError.FORBIDDEN.createException("Authentication required");
         }
@@ -82,11 +83,13 @@ public class OpdsBookService {
                 .map(Library::getId)
                 .collect(Collectors.toSet());
 
+		String sortBy = sortOrder != null ? sortOrder.name() : "RECENT";
+
         if (shelfIds != null && !shelfIds.isEmpty()) {
             validateShelfAccess(shelfIds, user.getId(), isAdmin);
             Page<Book> books = query != null && !query.isBlank()
                     ? searchByMetadataInShelvesPageInternal(BookUtils.normalizeForSearch(query), shelfIds, page, size, userId)
-                    : getBooksByShelfIdsPageInternal(shelfIds, page, size, userId);
+                    : getBooksByShelfIdsPageInternal(shelfIds, sortBy, page, size, userId);
             return applyBookFilters(books, userId);
         }
 
@@ -94,19 +97,19 @@ public class OpdsBookService {
             validateLibraryAccess(libraryId, userLibraryIds, isAdmin);
             Page<Book> books = query != null && !query.isBlank()
                     ? searchByMetadataInLibrariesPageInternal(BookUtils.normalizeForSearch(query), Set.of(libraryId), page, size, userId)
-                    : getBooksByLibraryIdsPageInternal(Set.of(libraryId), page, size, userId);
+                    : getBooksByLibraryIdsPageInternal(Set.of(libraryId), sortBy, page, size, userId);
             return applyBookFilters(books, userId);
         }
 
         if (isAdmin) {
             return query != null && !query.isBlank()
                     ? searchByMetadataPageInternal(BookUtils.normalizeForSearch(query), page, size, null)
-                    : getAllBooksPageInternal(page, size, null);
+                    : getAllBooksPageInternal(sortBy, page, size, null);
         }
 
         Page<Book> books = query != null && !query.isBlank()
                 ? searchByMetadataInLibrariesPageInternal(BookUtils.normalizeForSearch(query), userLibraryIds, page, size, userId)
-                : getBooksByLibraryIdsPageInternal(userLibraryIds, page, size, userId);
+                : getBooksByLibraryIdsPageInternal(userLibraryIds, sortBy, page, size, userId);
         return applyBookFilters(books, userId);
     }
 
@@ -130,6 +133,16 @@ public class OpdsBookService {
         Page<Book> books = getRecentBooksByLibraryIdsPageInternal(libraryIds, page, size, userId);
         return applyBookFilters(books, userId);
     }
+
+	public Page<Book> getUnreadBooksPage(Long userId, int page, int size, OpdsSortOrder sortOrder) {
+		if (userId == null) {
+			throw ApiError.FORBIDDEN.createException("Authentication required");
+		}
+
+		String sortBy = sortOrder != null ? sortOrder.name() : "RECENT";
+
+		return getUnreadBooksPageInternal(sortBy, page, size, userId);
+	}
 
     public String getLibraryName(Long libraryId) {
         try {
@@ -203,7 +216,7 @@ public class OpdsBookService {
                 .toList();
     }
 
-    public Page<Book> getBooksByAuthorName(Long userId, String authorName, int page, int size) {
+    public Page<Book> getBooksByAuthorName(Long userId, String authorName, int page, int size, OpdsSortOrder sortOrder) {
         if (userId == null) {
             throw ApiError.FORBIDDEN.createException("Authentication required");
         }
@@ -213,9 +226,10 @@ public class OpdsBookService {
         BookLoreUser user = bookLoreUserTransformer.toDTO(entity);
 
         Pageable pageable = PageRequest.of(Math.max(page, 0), size);
+		String sortBy = sortOrder != null ? sortOrder.name() : "RECENT";
 
         if (user.getPermissions().isAdmin()) {
-            Page<Long> idPage = bookOpdsRepository.findBookIdsByAuthorName(authorName, pageable);
+            Page<Long> idPage = bookOpdsRepository.findBookIdsByAuthorName(authorName, sortBy, pageable);
             if (idPage.isEmpty()) {
                 return new PageImpl<>(List.of(), pageable, 0);
             }
@@ -227,7 +241,7 @@ public class OpdsBookService {
                 .map(Library::getId)
                 .collect(Collectors.toSet());
 
-        Page<Long> idPage = bookOpdsRepository.findBookIdsByAuthorNameAndLibraryIds(authorName, libraryIds, pageable);
+        Page<Long> idPage = bookOpdsRepository.findBookIdsByAuthorNameAndLibraryIds(authorName, libraryIds, sortBy, pageable);
         if (idPage.isEmpty()) {
             return new PageImpl<>(List.of(), pageable, 0);
         }
@@ -257,7 +271,7 @@ public class OpdsBookService {
         return bookOpdsRepository.findDistinctSeriesByLibraryIds(libraryIds);
     }
 
-    public Page<Book> getBooksBySeriesName(Long userId, String seriesName, int page, int size) {
+    public Page<Book> getBooksBySeriesName(Long userId, String seriesName, int page, int size, OpdsSortOrder sortOrder) {
         if (userId == null) {
             throw ApiError.FORBIDDEN.createException("Authentication required");
         }
@@ -267,9 +281,10 @@ public class OpdsBookService {
         BookLoreUser user = bookLoreUserTransformer.toDTO(entity);
 
         Pageable pageable = PageRequest.of(Math.max(page, 0), size);
+		String sortBy = sortOrder != null ? sortOrder.name() : "RECENT";
 
         if (user.getPermissions().isAdmin()) {
-            Page<Long> idPage = bookOpdsRepository.findBookIdsBySeriesName(seriesName, pageable);
+            Page<Long> idPage = bookOpdsRepository.findBookIdsBySeriesName(seriesName, sortBy, pageable);
             if (idPage.isEmpty()) {
                 return new PageImpl<>(List.of(), pageable, 0);
             }
@@ -281,7 +296,7 @@ public class OpdsBookService {
                 .map(Library::getId)
                 .collect(Collectors.toSet());
 
-        Page<Long> idPage = bookOpdsRepository.findBookIdsBySeriesNameAndLibraryIds(seriesName, libraryIds, pageable);
+        Page<Long> idPage = bookOpdsRepository.findBookIdsBySeriesNameAndLibraryIds(seriesName, libraryIds, sortBy, pageable);
         if (idPage.isEmpty()) {
             return new PageImpl<>(List.of(), pageable, 0);
         }
@@ -291,10 +306,10 @@ public class OpdsBookService {
         return applyBookFilters(booksPage, userId);
     }
 
-    private Page<Book> getAllBooksPageInternal(int page, int size, Long userId) {
+    private Page<Book> getAllBooksPageInternal(String sortBy, int page, int size, Long userId) {
         Pageable pageable = PageRequest.of(Math.max(page, 0), size);
 
-        Page<Long> idPage = bookOpdsRepository.findBookIds(pageable);
+        Page<Long> idPage = bookOpdsRepository.findBookIds(sortBy, pageable);
         if (idPage.isEmpty()) {
             return new PageImpl<>(List.of(), pageable, 0);
         }
@@ -315,10 +330,22 @@ public class OpdsBookService {
         return createPageFromEntities(books, idPage, pageable, userId);
     }
 
-    private Page<Book> getBooksByLibraryIdsPageInternal(Set<Long> libraryIds, int page, int size, Long userId) {
+	private Page<Book> getUnreadBooksPageInternal(String sortBy, int page, int size, Long userId) {
+		Pageable pageable = PageRequest.of(Math.max(page, 0), size);
+
+		Page<Long> idPage = bookOpdsRepository.findUnreadBookIds(userId, sortBy, pageable);
+		if (idPage.isEmpty()) {
+			return new PageImpl<>(List.of(), pageable, 0);
+		}
+
+		List<BookEntity> books = bookOpdsRepository.findAllWithFullMetadataByIds(idPage.getContent());
+		return createPageFromEntities(books, idPage, pageable, userId);
+	}
+
+    private Page<Book> getBooksByLibraryIdsPageInternal(Set<Long> libraryIds, String sortBy, int page, int size, Long userId) {
         Pageable pageable = PageRequest.of(Math.max(page, 0), size);
 
-        Page<Long> idPage = bookOpdsRepository.findBookIdsByLibraryIds(libraryIds, pageable);
+        Page<Long> idPage = bookOpdsRepository.findBookIdsByLibraryIds(libraryIds, sortBy, pageable);
         if (idPage.isEmpty()) {
             return new PageImpl<>(List.of(), pageable, 0);
         }
@@ -351,10 +378,10 @@ public class OpdsBookService {
         return createPageFromEntities(books, idPage, pageable, userId);
     }
 
-    private Page<Book> getBooksByShelfIdsPageInternal(Set<Long> shelfIds, int page, int size, Long userId) {
+    private Page<Book> getBooksByShelfIdsPageInternal(Set<Long> shelfIds, String sortBy, int page, int size, Long userId) {
         Pageable pageable = PageRequest.of(Math.max(page, 0), size);
 
-        Page<Long> idPage = bookOpdsRepository.findBookIdsByShelfIds(shelfIds, pageable);
+        Page<Long> idPage = bookOpdsRepository.findBookIdsByShelfIds(shelfIds, sortBy, pageable);
         if (idPage.isEmpty()) {
             return new PageImpl<>(List.of(), pageable, 0);
         }
@@ -584,6 +611,36 @@ public class OpdsBookService {
                 // Same rating, fall back to addedOn descending
                 return compareByAddedOn(b2, b1);
             });
+			case PUBLISHED_ASC -> sortedBooks.sort((b1, b2) -> {
+				LocalDate publishedDate1 = getPublishedDate(b1);
+				LocalDate publishedDate2 = getPublishedDate(b2);
+				// Books with no published date go to the end
+				if (publishedDate1 == null && publishedDate2 == null) {
+					// Both have no published date, fall back to addedOn descending
+					return compareByAddedOn(b2, b1);
+				}
+				if (publishedDate1 == null) return 1;
+				if (publishedDate2 == null) return -1;
+				int dateComp = publishedDate1.compareTo(publishedDate2);
+				if (dateComp != 0) return dateComp;
+				// Same published date, fall back to addedOn descending
+				return compareByAddedOn(b2, b1);
+			});
+			case PUBLISHED_DESC -> sortedBooks.sort((b1, b2) -> {
+				LocalDate publishedDate1 = getPublishedDate(b1);
+				LocalDate publishedDate2 = getPublishedDate(b2);
+				// Books with no published date go to the end
+				if (publishedDate1 == null && publishedDate2 == null) {
+					// Both have no published date, fall back to addedOn descending
+					return compareByAddedOn(b2, b1);
+				}
+				if (publishedDate1 == null) return 1;
+				if (publishedDate2 == null) return -1;
+				int dateComp = publishedDate2.compareTo(publishedDate1);
+				if (dateComp != 0) return dateComp;
+				// Same published date, fall back to addedOn descending
+				return compareByAddedOn(b2, b1);
+			});
         }
 
         return new PageImpl<>(sortedBooks, booksPage.getPageable(), booksPage.getTotalElements());
@@ -649,4 +706,11 @@ public class OpdsBookService {
 
         return (float) (sum / count);
     }
+
+	private LocalDate getPublishedDate(Book book) {
+		if (book.getMetadata() != null && book.getMetadata().getPublishedDate() != null) {
+			return book.getMetadata().getPublishedDate();
+		}
+		return null;
+	}
 }
